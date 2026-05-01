@@ -1,112 +1,53 @@
+from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import Pipeline
+
+# ============================================================
+# PLAYER STRUCTURE
+# ============================================================
+
+@dataclass
+class Player:
+    name: str
+    sg_total: float
+    sg_approach: float
+    recent_form: float
+    volatility: float
+    rating: float = 0.0
+    expected_score: float = 0.0
+
+    def calculate_rating(self, weights):
+        self.rating = (
+            weights["SG_total"] * self.sg_total +
+            weights["SG_approach"] * self.sg_approach +
+            weights["recent_form"] * self.recent_form
+        )
+
+    def calculate_expected_score(self, field_average=-8, scale=4):
+        self.expected_score = field_average - self.rating * scale
 
 
 # ============================================================
-# PART 1: HISTORICAL DATA WEIGHT OPTIMIZATION
+# HELPER FUNCTIONS
 # ============================================================
 
-def optimize_weights(history_file):
-    """
-    Uses historical PGA Championship data to learn better feature weights.
-
-    CSV must include:
-    year, player, SG_total, SG_approach, recent_form, finish_position
-    """
-
-    history = pd.read_csv(history_file)
-
-    history["top_10"] = history["finish_position"] <= 10
-
-    features = ["SG_total", "SG_approach", "recent_form"]
-
-    X = history[features]
-    y = history["top_10"]
-
-    model = Pipeline([
-        ("scaler", StandardScaler()),
-        ("log_reg", LogisticRegression())
+def players_to_dataframe(players):
+    return pd.DataFrame([
+        {
+            "player": p.name,
+            "SG_total": p.sg_total,
+            "SG_approach": p.sg_approach,
+            "recent_form": p.recent_form,
+            "volatility": p.volatility,
+            "rating": p.rating,
+            "expected_score": p.expected_score
+        }
+        for p in players
     ])
 
-    model.fit(X, y)
 
-    coefficients = model.named_steps["log_reg"].coef_[0]
-
-    weights = pd.DataFrame({
-        "feature": features,
-        "raw_weight": coefficients,
-        "absolute_importance": abs(coefficients)
-    })
-
-    weights["optimized_weight"] = (
-        weights["absolute_importance"] /
-        weights["absolute_importance"].sum()
-    )
-
-    return weights
-
-
-# ============================================================
-# PART 2: BUILD PLAYER RATINGS
-# ============================================================
-
-def build_player_ratings(players_df, weights_df):
-    """
-    Creates a player rating using optimized weights.
-    """
-
-    players_df = players_df.copy()
-
-    weight_dict = dict(zip(
-        weights_df["feature"],
-        weights_df["optimized_weight"]
-    ))
-
-    players_df["rating"] = (
-        weight_dict["SG_total"] * players_df["SG_total"] +
-        weight_dict["SG_approach"] * players_df["SG_approach"] +
-        weight_dict["recent_form"] * players_df["recent_form"]
-    )
-
-    return players_df
-
-
-# ============================================================
-# PART 3: CONVERT RATING TO EXPECTED SCORE
-# ============================================================
-
-def add_expected_scores(players_df, field_average=-8, scale=4):
-    """
-    Converts rating into a projected 72-hole score.
-
-    Lower score = better.
-    """
-
-    players_df = players_df.copy()
-
-    players_df["expected_score"] = (
-        field_average - players_df["rating"] * scale
-    )
-
-    return players_df
-
-
-# ============================================================
-# PART 4: MONTE CARLO SIMULATION
-# ============================================================
-
-def simulate_tournament(players_df, sims=20000, random_seed=42):
-    """
-    Simulates the tournament many times.
-
-    Needed columns:
-    player, expected_score, volatility
-    """
-
+def simulate_tournament(players_df, sims=50000, random_seed=42):
     np.random.seed(random_seed)
 
     win_counts = {player: 0 for player in players_df["player"]}
@@ -147,86 +88,40 @@ def simulate_tournament(players_df, sims=20000, random_seed=42):
 
 
 # ============================================================
-# PART 5: SAMPLE CURRENT PLAYER DATA
-# ============================================================
-
-players = pd.DataFrame({
-    "player": [
-        "Scottie Scheffler",
-        "Rory McIlroy",
-        "Jon Rahm",
-        "Xander Schauffele",
-        "Collin Morikawa",
-        "Bryson DeChambeau",
-        "Viktor Hovland",
-        "Ludvig Aberg",
-        "Patrick Cantlay",
-        "Brooks Koepka"
-    ],
-    "SG_total": [
-        2.5, 2.1, 2.0, 1.9, 1.8,
-        1.7, 1.6, 1.5, 1.4, 1.3
-    ],
-    "SG_approach": [
-        1.4, 1.2, 1.1, 1.0, 1.3,
-        0.9, 1.0, 0.8, 0.9, 0.7
-    ],
-    "recent_form": [
-        2.2, 1.8, 1.7, 1.6, 1.5,
-        1.6, 1.2, 1.4, 1.1, 1.3
-    ],
-    "volatility": [
-        2.8, 3.4, 3.5, 3.2, 3.0,
-        4.0, 3.7, 3.9, 3.2, 4.1
-    ]
-})
-
-
-# ============================================================
-# PART 6: RUN EVERYTHING
+# MAIN PROGRAM
 # ============================================================
 
 if __name__ == "__main__":
 
-    # Option A:
-    # Use optimized weights from historical data.
-    #
-    # Uncomment this when you have the CSV file:
-    #
-    # weights = optimize_weights("pga_championship_history.csv")
+    weights = {
+        "SG_total": 0.60,
+        "SG_approach": 0.30,
+        "recent_form": 0.10
+    }
 
-    # Option B:
-    # Temporary fallback weights until you have historical data.
+    players = [
+        Player("Scottie Scheffler", 2.5, 1.4, 2.2, 2.8),
+        Player("Rory McIlroy", 2.1, 1.2, 1.8, 3.4),
+        Player("Jon Rahm", 2.0, 1.1, 1.7, 3.5),
+        Player("Xander Schauffele", 1.9, 1.0, 1.6, 3.2),
+        Player("Collin Morikawa", 1.8, 1.3, 1.5, 3.0),
+        Player("Bryson DeChambeau", 1.7, 0.9, 1.6, 4.0),
+        Player("Viktor Hovland", 1.6, 1.0, 1.2, 3.7),
+        Player("Ludvig Aberg", 1.5, 0.8, 1.4, 3.9),
+        Player("Patrick Cantlay", 1.4, 0.9, 1.1, 3.2),
+        Player("Brooks Koepka", 1.3, 0.7, 1.3, 4.1),
+    ]
 
-    weights = pd.DataFrame({
-        "feature": ["SG_total", "SG_approach", "recent_form"],
-        "optimized_weight": [0.60, 0.30, 0.10]
-    })
+    for player in players:
+        player.calculate_rating(weights)
+        player.calculate_expected_score(field_average=-8, scale=4)
 
-    players = build_player_ratings(players, weights)
+    players_df = players_to_dataframe(players)
 
-    players = add_expected_scores(
-        players,
-        field_average=-8,
-        scale=4
-    )
+    results = simulate_tournament(players_df)
 
-    results = simulate_tournament(
-        players,
-        sims=50000,
-        random_seed=42
-    )
-
-    print("\nOptimized Weights:")
-    print(weights)
-
-    print("\nPlayer Ratings:")
-    print(players[[
-        "player",
-        "rating",
-        "expected_score",
-        "volatility"
-    ]].sort_values("rating", ascending=False))
+    print("\nPlayer Data:")
+    print(players_df.sort_values("rating", ascending=False))
 
     print("\nSimulation Results:")
     print(results)
