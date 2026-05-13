@@ -12,10 +12,16 @@ from .features import normalize_rank_map
 log = logging.getLogger(__name__)
 
 HISTORICAL_CSV = DATA_DIR / "historical_results.csv"
+COURSES_CSV = DATA_DIR / "courses.csv"
 
 
 def load_history_from_csv() -> pd.DataFrame:
     return pd.read_csv(HISTORICAL_CSV)
+
+
+def load_courses() -> pd.DataFrame:
+    """PGA Championship course metadata per year. Used for course-fit features."""
+    return pd.read_csv(COURSES_CSV)
 
 
 def load_history_from_espn(years=TRAIN_YEARS) -> pd.DataFrame:

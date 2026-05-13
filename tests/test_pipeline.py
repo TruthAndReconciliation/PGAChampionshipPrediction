@@ -4,7 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.data_io import load_history_from_csv
+from src.data_io import load_courses, load_history_from_csv
 from src.features import build_prediction_frame, build_training_frame, FEATURE_COLS
 from src.model import score_field, train
 
@@ -26,12 +26,13 @@ def test_training_frame_shape():
 
 def test_end_to_end_offline():
     h = load_history_from_csv()
-    X, y, meta = build_training_frame(h, min_year=h["year"].min() + 2)
+    c = load_courses()
+    X, y, meta = build_training_frame(h, min_year=h["year"].min() + 2, courses=c)
     m = train(X, y, groups=meta["year"])
 
     field = ["Scottie Scheffler", "Brooks Koepka", "Rory McIlroy",
              "Xander Schauffele", "Bryson DeChambeau"]
-    Xp = build_prediction_frame(field, h, asof_year=2026)
+    Xp = build_prediction_frame(field, h, asof_year=2026, courses=c)
     board = score_field(m, Xp)
 
     assert len(board) == len(field)
@@ -47,8 +48,23 @@ def test_end_to_end_offline():
     assert rank_of["Scottie Scheffler"] < rank_of["Rory McIlroy"]
 
 
+def test_course_fit_features_are_populated():
+    """Course-fit columns should differentiate players when courses are provided."""
+    h = load_history_from_csv()
+    c = load_courses()
+    Xp = build_prediction_frame(
+        ["Scottie Scheffler", "Rory McIlroy"], h, asof_year=2026, courses=c,
+    )
+    # Scheffler has parkland/bent finishes in history; Rory has none in CSV.
+    assert Xp.loc["Scottie Scheffler", "similar_type_finish"] < 35.0
+    assert Xp.loc["Rory McIlroy",       "similar_type_finish"] == 35.0
+    # Aronimink has never hosted a PGA Championship → venue feature defaults.
+    assert Xp.loc["Scottie Scheffler", "venue_avg_finish"] == 35.0
+
+
 if __name__ == "__main__":
     test_history_load()
     test_training_frame_shape()
     test_end_to_end_offline()
+    test_course_fit_features_are_populated()
     print("ok")

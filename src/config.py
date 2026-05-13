@@ -17,10 +17,12 @@ ESPN_CORE = "https://sports.core.api.espn.com/v2/sports/golf/leagues/pga"
 ENDPOINTS = {
     "scoreboard":      f"{ESPN_SITE}/scoreboard",           # ?dates=YYYYMMDD
     "rankings":        f"{ESPN_SITE}/rankings",             # current OWGR snapshot
-    "leaderboard":     f"{ESPN_SITE}/leaderboard",          # ?event=<id>
+    "leaderboard":     f"{ESPN_SITE}/leaderboard",          # ?tournamentId=<id> (also accepts ?event=)
     "season_events":   f"{ESPN_CORE}/seasons/{{year}}/events",
     "event":           f"{ESPN_CORE}/events/{{event_id}}",
     "athlete":         f"{ESPN_CORE}/athletes/{{athlete_id}}",
+    "venues":          f"{ESPN_CORE}/venues",               # course catalog
+    "venue":           f"{ESPN_CORE}/venues/{{venue_id}}",
 }
 
 # PGA Championship has been the year's second major since 2019 (May).

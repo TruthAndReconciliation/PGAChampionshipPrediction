@@ -31,14 +31,16 @@ from .features import FEATURE_COLS
 log = logging.getLogger(__name__)
 
 # Heuristic weights — higher = better expected finish. Hand-set, not learned.
-# Calibrated so the dominant signal is recent form, with experience as a bonus
-# and stale form as a penalty. Lower returned value = better player.
+# Lower returned value = better player. Course-fit terms are zero-effect when
+# unavailable because the unknown-value sentinel (35) sits near the field median.
 _H_WEIGHTS = {
-    "recency_weighted_finish": +1.0,   # finish position is "lower better"
+    "recency_weighted_finish": +1.0,
     "top10_rate":              -8.0,
     "career_pga_champ_wins":   -2.0,
     "years_since_top10":       +0.25,
-    "log_rank":                +0.6,   # via OWGR when available; constant otherwise
+    "log_rank":                +0.6,
+    "course_fit_score":        +0.35,  # blended scalar; lower = better fit
+    "venue_avg_finish":        +0.10,  # exact venue history matters when present
 }
 
 

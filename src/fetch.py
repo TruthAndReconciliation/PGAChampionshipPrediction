@@ -74,8 +74,38 @@ def find_pga_championship(year: int) -> dict | None:
 
 
 def get_leaderboard(event_id: str | int) -> dict:
-    """Return the leaderboard payload for an event id (final round = final standings)."""
-    return http_get(ENDPOINTS["leaderboard"], {"event": str(event_id)})
+    """Return the leaderboard payload for an event id (final round = final standings).
+
+    The public ESPN doc uses ?tournamentId=<id>; older clients use ?event=<id>.
+    Both currently work, but we prefer the documented form and fall back.
+    """
+    try:
+        return http_get(ENDPOINTS["leaderboard"], {"tournamentId": str(event_id)})
+    except Exception:
+        return http_get(ENDPOINTS["leaderboard"], {"event": str(event_id)})
+
+
+def get_venue(venue_id: str | int) -> dict:
+    """Return venue (course) metadata. Used for course-fit features."""
+    return http_get(ENDPOINTS["venue"].format(venue_id=venue_id))
+
+
+def get_event(event_id: str | int) -> dict:
+    """Return full event payload (includes venue ref and competition refs)."""
+    return http_get(ENDPOINTS["event"].format(event_id=event_id))
+
+
+def event_venue_id(event: dict) -> str | None:
+    """Pull the venue id out of an ESPN event payload (handles $ref shapes)."""
+    v = event.get("venue") or {}
+    if isinstance(v, dict):
+        if "id" in v:
+            return str(v["id"])
+        ref = v.get("$ref")
+        if ref:
+            # .../venues/<id>?... — last path segment before query string.
+            return ref.rstrip("/").split("/")[-1].split("?")[0]
+    return None
 
 
 def get_current_rankings() -> list[dict]:
@@ -134,6 +164,9 @@ __all__ = [
     "find_pga_championship",
     "get_leaderboard",
     "get_current_rankings",
+    "get_venue",
+    "get_event",
+    "event_venue_id",
     "iter_field",
     "player_row",
 ]

@@ -16,7 +16,7 @@ from pathlib import Path
 import pandas as pd
 
 from .config import DATA_DIR, TARGET_YEAR
-from .data_io import load_current_field, load_history, load_history_from_csv
+from .data_io import load_courses, load_current_field, load_history, load_history_from_csv
 from .features import build_prediction_frame, build_training_frame
 from .model import score_field, train
 
@@ -58,9 +58,13 @@ def main(argv: list[str] | None = None) -> int:
     log = logging.getLogger("predict")
 
     history = load_history_from_csv() if args.offline else load_history(prefer_live=True)
+    courses = load_courses()
     log.info("History: %s rows across %s seasons", len(history), history["year"].nunique())
+    log.info("Course metadata for %s seasons (incl. target)", len(courses))
 
-    X, y, meta = build_training_frame(history, min_year=history["year"].min() + 2)
+    X, y, meta = build_training_frame(
+        history, min_year=history["year"].min() + 2, courses=courses,
+    )
     log.info("Training rows: %s", len(X))
     model = train(X, y, groups=meta["year"])
     log.info("Cross-val MAE on finish position: %.2f", model.cv_mae)
@@ -76,8 +80,16 @@ def main(argv: list[str] | None = None) -> int:
             log.warning("Live field unavailable; using historical regulars as a stand-in.")
             field = _default_field(history)
 
-    X_pred = build_prediction_frame(field, history, asof_year=args.year, ranks=ranks)
+    X_pred = build_prediction_frame(
+        field, history, asof_year=args.year, ranks=ranks, courses=courses,
+    )
     board = score_field(model, X_pred)
+
+    target_course = courses[courses["year"] == args.year]
+    if len(target_course):
+        tc = target_course.iloc[0]
+        log.info("Target venue: %s (%s yds, par %s, %s, %s greens)",
+                 tc["course"], tc["yardage"], tc["par"], tc["course_type"], tc["grass_green"])
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     board.to_csv(args.out, index=False)
